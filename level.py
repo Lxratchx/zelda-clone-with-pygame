@@ -4,26 +4,37 @@ from tile import Tile
 from player import Player
 from debug import debug
 from support import *
-from random import choice
+from random import choice, randint
 from weapon import Weapon
 from ui import UI
 from enemy import Enemy
-
+from particles import AnimationPlayer
+from magic import MagicPlayer
+from upgrade import Upgrade
 
 class Level:
     def __init__(self) -> None:
         self.display_surface = pygame.display.get_surface()
+        self.game_paused = False
+
+        # groups
         self.visible_sprites = YSortCameraGroup()
         self.obstacles_sprites = pygame.sprite.Group()
+        self.attack_sprites = pygame.sprite.Group()
+        self.attackable_sprites = pygame.sprite.Group()
 
         # attack sprites
         self.current_attack = None
         self.current_magic = None
 
+        self.animation_player = AnimationPlayer()
+        self.magic_player = MagicPlayer(self.animation_player)
+
         self.create_map()
 
         # UI
         self.ui = UI()
+        self.upgrade = Upgrade(self.player)
     
     def create_map(self):
         layouts = {
@@ -47,7 +58,7 @@ class Level:
 
                         if style == 'grass':
                             rnd_grass_choice = choice(graphics['grass'])
-                            Tile((x, y), [self.obstacles_sprites, self.visible_sprites], 'grass', rnd_grass_choice)
+                            Tile((x, y), [self.obstacles_sprites, self.visible_sprites, self.attackable_sprites], 'grass', rnd_grass_choice)
                         
                         if style == 'object':
                             object_ = graphics['object'][int(col)]
@@ -66,25 +77,74 @@ class Level:
                             
                             else:
                                 monster_name = monster_name_by_ids[col]
-                                self.enemy = Enemy(monster_name, (x, y), self.obstacles_sprites, self.visible_sprites)
+                                self.enemy = Enemy(
+                                    monster_name, 
+                                    (x, y), 
+                                    self.obstacles_sprites,
+                                    self.player_damage,
+                                    self.trigger_death_particles,
+                                    self.add_xp,
+                                    self.visible_sprites,
+                                    self.attackable_sprites
+                                )
     
+    def toggle_menu(self):
+        self.game_paused = not self.game_paused
+
+    def player_attack_logic(self):
+        if self.attack_sprites:
+            for attack_sprite in self.attack_sprites:
+                collision_sprites = pygame.sprite.spritecollide(attack_sprite, self.attackable_sprites, False)
+                if collision_sprites:
+                    for target_sprite in collision_sprites:
+                        if target_sprite.sprite_type == 'grass':
+                            pos = target_sprite.rect.center
+                            offset = pygame.math.Vector2(0, 75)
+                            for i in range(randint(3, 6)):
+                                self.animation_player.create_grass_particle(pos-offset, self.visible_sprites)
+                            target_sprite.kill()
+
+                        elif target_sprite.sprite_type == 'enemy':
+                            target_sprite.get_damage(self.player, attack_sprite.sprite_type)
+
     def create_attack(self):
-        self.current_attack = Weapon(self.player, self.visible_sprites)
+        self.current_attack = Weapon(self.player, self.visible_sprites, self.attack_sprites)
     
     def create_magic(self, style, strength, cost):
-        print(style, strength, cost)
+        if style == 'heal':
+            self.magic_player.heal(self.player, cost, strength, self.visible_sprites)
+        elif style == 'flame':
+            self.magic_player.flame(self.player, cost, self.visible_sprites, self.attack_sprites)
 
     def destroy_weapon(self):
         if self.current_attack:
             self.current_attack.kill()
         self.current_attack = None
 
+    def player_damage(self, amount, attack_type):
+        if self.player.vulnerable:
+            self.player.health -= amount
+            self.player.vulnerable = False
+            self.player.hurt_time = pygame.time.get_ticks()
+            self.animation_player.generate_particles(attack_type, self.player.rect.center, self.visible_sprites)
+
+    def trigger_death_particles(self, pos, particle_type):
+        self.animation_player.generate_particles(particle_type, pos, self.visible_sprites)
+
+    def add_xp(self, amount):
+        self.player.exp += amount
+
     def run(self):
-        self.enemy.get_status(self.player)
         self.visible_sprites.custom_draw(self.player)
-        self.visible_sprites.update()
-        self.visible_sprites.enemy_update(self.player)
         self.ui.display(self.player)
+
+        if self.game_paused:
+            self.upgrade.display()
+        else:
+            self.visible_sprites.update()
+            self.visible_sprites.enemy_update(self.player)
+            self.player_attack_logic()
+
         
 
 
