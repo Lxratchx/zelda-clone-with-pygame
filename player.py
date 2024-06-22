@@ -55,7 +55,29 @@ class Player(Entity):
         self.energy = self.stats['energy']
         self.attack = self.stats['attack']
         self.speed = self.stats['speed']
-        self.exp = 123
+        self.exp = 5000
+
+        # updating
+        self.max_stats = {
+            'health': 300,
+            'energy': 140,
+            'attack': 20,
+            'magic': 10,
+            'speed': 10
+        }
+        self.upgrade_cost = {
+            'health': 100,
+            'energy': 100,
+            'attack': 100,
+            'magic': 100,
+            'speed': 100
+        }
+
+        # damage timer
+        self.vulnerable = False
+        self.hurt_time = 0
+        self.invulnerable_cooldown = 400
+
     
     def import_player_animations(self):
         graphics_folder = 'graphics/player'
@@ -78,6 +100,13 @@ class Player(Entity):
             folder = import_folder(path)
             self.animations[animation] = folder
 
+    def energy_recovery(self):
+        if self.energy < self.stats['energy']:
+            self.energy += .01 * self.stats['magic']
+        
+        else:
+            self.energy = self.stats['energy']
+
     def animate(self):
         if self.status not in self.animations:
             return
@@ -91,6 +120,12 @@ class Player(Entity):
         
         self.image = animation[int(self.frame_index)]
         self.rect = self.image.get_rect(center=self.hitbox.center)
+
+        if not self.vulnerable:
+            alpha = self.wave_value()
+            self.image.set_alpha(alpha)
+        else:
+            self.image.set_alpha(255)
 
     def get_status(self):
         was_idle = 'idle' in self.status
@@ -111,6 +146,16 @@ class Player(Entity):
             
         elif was_attacking:
             self.status = self.status.replace('_attack', '_idle')
+
+    def get_full_weapon_damage(self):
+        base_damage = self.stats['attack']
+        weapon_damage = weapon_settings[self.weapon]['damage']
+        return base_damage + weapon_damage
+
+    def get_full_magic_damage(self):
+        base_damage = self.stats['magic']
+        weapon_damage = magic_settings[self.magic]['strength']
+        return base_damage + weapon_damage
 
     def input(self):
         if self.attacking:
@@ -180,7 +225,7 @@ class Player(Entity):
             
     def cooldowns(self):
         current_time = pygame.time.get_ticks()
-        cooldown_finished = current_time - self.attacking_time >= self.attacking_cooldown
+        cooldown_finished = current_time - self.attacking_time >= self.attacking_cooldown + weapon_settings[self.weapon]['cooldown']
         if self.attacking and cooldown_finished:
             self.attacking = False   
             self.destroy_attack()
@@ -194,39 +239,16 @@ class Player(Entity):
         switch_magic_cooldown_finish = current_time - self.magic_switch_time >= self.magic_switch_cooldown
         if switch_magic_cooldown_finish:
             self.magic_can_switch = True
-   
-    # def move(self, speed):
-    #     if self.direction.magnitude() != 0:
-    #         self.direction = self.direction.normalize()
-
-    #     self.hitbox.x += self.direction.x * speed
-    #     self.collision('horizontal')
-    #     self.hitbox.y += self.direction.y * speed
-    #     self.collision('vertical')
-    #     self.rect.center = self.hitbox.center
-    
-    # def collision(self, direction):
-    #     if direction == 'horizontal':
-    #         for sprite in self.obstacle_sprites:
-    #             if sprite.hitbox.colliderect(self.hitbox):
-    #                 if self.direction.x > 0:
-    #                     self.hitbox.right = sprite.hitbox.left
-                    
-    #                 if self.direction.x < 0:
-    #                     self.hitbox.left = sprite.hitbox.right
         
-    #     if direction == 'vertical':
-    #         for sprite in self.obstacle_sprites:
-    #             if sprite.hitbox.colliderect(self.hitbox):
-    #                 if self.direction.y > 0:
-    #                     self.hitbox.bottom = sprite.hitbox.top
-                    
-    #                 if self.direction.y < 0:
-    #                     self.hitbox.top = sprite.hitbox.bottom
-    
+        # vulnerability
+        vulnerability_cooldown_finish = current_time - self.hurt_time >= self.invulnerable_cooldown
+        if vulnerability_cooldown_finish:
+            self.vulnerable = True
+   
     def update(self) -> None:
         self.input()
         self.get_status()
         self.cooldowns()
-        self.move(self.speed)
+        self.move(self.stats['speed'])
         self.animate()
+        self.energy_recovery()

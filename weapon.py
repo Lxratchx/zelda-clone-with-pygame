@@ -7,6 +7,7 @@ from os import path
 class Weapon(pygame.sprite.Sprite):
     def __init__(self, player: Player, *groups) -> None:
         super().__init__(*groups)
+        self.sprite_type = 'weapon'
         direction = sub(r'_\w+$', '', player.status)
         graphics = f'graphics/weapons/{player.weapon}'
 
