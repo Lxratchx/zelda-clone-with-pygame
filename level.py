@@ -16,6 +16,7 @@ class Level:
     def __init__(self) -> None:
         self.display_surface = pygame.display.get_surface()
         self.game_paused = False
+        self.player_alive = True
 
         # groups
         self.visible_sprites = YSortCameraGroup()
@@ -35,6 +36,9 @@ class Level:
         # UI
         self.ui = UI()
         self.upgrade = Upgrade(self.player)
+
+        self.hit_sound = pygame.mixer.Sound('audio/hit.wav')
+        self.hit_sound.set_volume(.2)
     
     def create_map(self):
         layouts = {
@@ -123,6 +127,7 @@ class Level:
 
     def player_damage(self, amount, attack_type):
         if self.player.vulnerable:
+            self.hit_sound.play()
             self.player.health -= amount
             self.player.vulnerable = False
             self.player.hurt_time = pygame.time.get_ticks()
@@ -144,7 +149,8 @@ class Level:
             self.visible_sprites.update()
             self.visible_sprites.enemy_update(self.player)
             self.player_attack_logic()
-
+            if self.player.health < 0:
+                self.player_alive = False
         
 
 

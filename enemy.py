@@ -46,6 +46,10 @@ class Enemy(Entity):
         self.player_damage = player_damage
         self.trigger_death_particles = trigger_death_particles
         self.add_xp = add_xp
+
+        
+        self.death_sound = pygame.mixer.Sound('audio/death.wav')
+        self.death_sound.set_volume(.2)
     
     def cooldowns(self):
         current_time = pygame.time.get_ticks()
@@ -57,7 +61,6 @@ class Enemy(Entity):
         invincibility_cooldown_finish = current_time - self.hit_time >= self.invincibility_cooldown
         if not self.vulnerable and invincibility_cooldown_finish:
             self.vulnerable = True
-
 
     def import_graphics(self, monster_name):
         animations = {}.fromkeys(['idle', 'move', 'attack'], [])
@@ -93,6 +96,7 @@ class Enemy(Entity):
             self.direction = self.get_player_distance_direction(player)[1]
             if attack_type == 'weapon':
                 self.health -= player.get_full_weapon_damage()
+
             elif attack_type == 'magic':
                 self.health -= player.get_full_magic_damage()
             
@@ -104,6 +108,7 @@ class Enemy(Entity):
             self.trigger_death_particles(self.rect.center, self.monster_name)
             self.kill()
             self.add_xp(self.exp)
+            self.death_sound.play()
     
     def hit_reaction(self):
         if not self.vulnerable:

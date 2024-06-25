@@ -22,6 +22,8 @@ class Player(Entity):
         self.attacking_cooldown = 400
         self.create_attack = create_attack
         self.destroy_attack = destroy_attack
+        self.attack_sound = pygame.mixer.Sound('audio/sword.wav')
+        self.attack_sound.set_volume(.2)
 
         self.obstacle_sprites = obstacle_sprites
 
@@ -191,6 +193,7 @@ class Player(Entity):
             self.attacking_time = pygame.time.get_ticks()
             self.attacking = True
             self.create_attack()
+            self.attack_sound.play()
         
         # magic
         if keys[pygame.K_LALT]:
